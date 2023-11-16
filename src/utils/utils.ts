@@ -8,6 +8,9 @@ export const useQueryString = () => {
   return searchParamsObject
 }
 
+// Kiểu dữ liệu trả về là boolean. error is AxiosError<T> Đây là một kiểu trả về của hàm. Nếu hàm trả về true, thì đối tượng được kiểm tra (error) sẽ có kiểu AxiosError<T>
 export function isAxiosError<T>(error: unknown): error is AxiosError<T> {
+  // axios.isAxiosError kiểm tra xem đối tượng error có phải là một lỗi của Axios hay không.
+  // Nếu đúng, hàm isAxiosError trả về true và kiểu trả về của hàm là AxiosError<T>. Nếu sai, hàm trả về false
   return axios.isAxiosError(error)
 }

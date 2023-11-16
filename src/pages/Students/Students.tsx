@@ -24,20 +24,24 @@ export default function Students() {
   // }, [])
   // ++++++++++ Khi chưa sử dụng React Query ++++++++++
 
-  const queryClient = useQueryClient()
+  const queryClient = useQueryClient() // Tham chiếu đến queryClient nằm trong src/index.tsx
   const queryString: { page?: string } = useQueryString()
   const page = Number(queryString.page) || 1
 
   const studentsQuery = useQuery({
     // Bản thân useQuery còn được gọi là query instance
-
     // queryKey: Nó là 1 cái key định danh cho cái query của chúng ta. React query sẽ quản lý cái việc query catching dựa trên cái
     // query keys của chúng ta. queryKey có thể là 1 simple array. Nó giống như là 1 dependency của useEffect vậy.
     // Cái query function của chúng ta hoàn toàn có thể bị phụ thuộc vào 1 cái biến nghĩa là khi cái biến đó thay đổi thì 
     // cái query function của chúng ta sẽ được trigger và chạy lại. Lúc đó chúng ta sẽ phải đặt cái biến đó vào trong queryKey
     // Vd: Mỗi khi mà cái page thay đổi thì cái query function của chúng ta sẽ được trigger và chạy lại
-
     // query function sẽ trả về 1 cái promise. Cái promise này có thể resolve the data hoặc throw an error
+    // Vd: Khi chưa sử dụng keepPreviousData: Khi mà ta từ trang 1 chuyển qua trang 2 có nghĩa là data của trang 2 nó chưa có (Nó là undefined)
+    // nên là khi qua trang 2 nó sẽ xuất hiện loading (Những trang mà chúng ta chưa load thì nó chưa có cache (nghĩa là data là undefined, loading là true))
+    // Khi sử dụng keepPreviousData: Khi mà ta từ trang 1 chuyển qua trang 2 có nghĩa là data của trang 2 nó chưa có (Mặc dù data vẫn là undefined nhưng
+    // lúc này loading sẽ là false (Nghĩa là nó vẫn giữ data trước đó) và khi mà nó fetch data thành công của trang số 2 thì nó mới
+    // cập nhật lại data mới cho trang số 2. (Nó sẽ không xuất hiện loading) (Tăng trải nghiệm ux người dùng))
+
     queryKey: ['students', page],
     queryFn: () => {
       const controller = new AbortController()
@@ -52,19 +56,16 @@ export default function Students() {
     retry: 0
   })
 
-  // Vd: Khi chưa sử dụng keepPreviousData: Khi mà ta từ trang 1 chuyển qua trang 2 có nghĩa là data của trang 2 nó chưa có (Nó là undefined)
-  // nên là khi qua trang 2 nó sẽ xuất hiện loading (Những trang mà chúng ta chưa load thì nó chưa có cache (nghĩa là data là undefined, loading là true))
-  // Khi sử dụng keepPreviousData: Khi mà ta từ trang 1 chuyển qua trang 2 có nghĩa là data của trang 2 nó chưa có (Mặc dù data vẫn là undefined nhưng
-  // lúc này loading sẽ là false (Nghĩa là nó vẫn giữ data trước đó) và khi mà nó fetch data thành công của trang số 2 thì nó mới
-  // cập nhật lại data mới cho trang số 2. (Nó sẽ không xuất hiện loading) (Tăng trải nghiệm ux người dùng))
-
   const totalStudentsCount = Number(studentsQuery.data?.headers['x-total-count'] || 0)
   const totalPage = Math.ceil(totalStudentsCount / LIMIT)
 
   const deleteStudentMutation = useMutation({
     mutationFn: (id: number | string) => deleteStudent(id),
+    // _: data trả về sau khi delete
     onSuccess: (_, id) => {
       toast.success(`Xóa thành công student với id là ${id}`)
+      // queryClient.invalidateQueries: Mỗi lần mà mình delete thành công thì nó sẽ chạy lên studentsQuery thông qua queryKey: ['students', page]
+      // và báo rằng data này đã cũ rồi đi cập nhật mới lại thôi. Lúc này query function trong studentsQuery sẽ được trigger và chạy lại api getStudents
       queryClient.invalidateQueries({ queryKey: ['students', page], exact: true })
     }
   })
@@ -74,10 +75,12 @@ export default function Students() {
   }
 
   const handlePrefetchStudent = (id: number) => {
-    // queryClient.prefetchQuery(['student', String(id)], {
-    //   queryFn: () => getStudent(id),
-    //   staleTime: 10 * 1000
-    // })
+    // Fetch api gọi trước thông qua queryKey: ['students', id],
+    queryClient.prefetchQuery(['student', String(id)], {
+      queryFn: () => getStudent(id),
+      // Kiểm tra xem kết quả cũ mà được gọi trước đấy đã quá 10s hay chưa. Nếu chưa thì không chạy query function này
+      staleTime: 10 * 1000
+    })
   }
 
   const fetchStudent = (second: number) => {

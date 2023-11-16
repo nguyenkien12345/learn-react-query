@@ -11,6 +11,7 @@ import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
+      // Khi chúng ta chuyển qua lại giữa các tab thì nó sẽ không có refresh lại các cái api của chúng ta
       refetchOnWindowFocus: false
     }
   }

@@ -36,11 +36,11 @@ export default function AddStudent() {
   const [formState, setFormState] = useState<FormStateType>(initialFormState)
 
   const addMatch = useMatch('/students/add') // Nếu mà route match với /students/add thì nó sẽ trả về 1 object còn ngược lại nếu không match thì trả về null
-  const isAddMode = Boolean(addMatch) // Nếu mà route match với /students/add thì nó sẽ trả về true còn ngược lại nếu không match thì trả về false
+  const isAddMode = Boolean(addMatch)          // Nếu mà route match với /students/add thì nó sẽ trả về true còn ngược lại nếu không match thì trả về false
 
   const { id } = useParams()
 
-  const queryClient = useQueryClient()
+  const queryClient = useQueryClient()  // Tham chiếu đến queryClient nằm trong src/index.tsx
 
   // useMutation sẽ trả về 1 cái object. Nó nhận vào 1 cái object. Trong object này có 1 cái key là mutationFn (Nó sẽ trả về 1 promise)
   const addStudentMutation = useMutation({
@@ -49,25 +49,32 @@ export default function AddStudent() {
     }
   })
 
+  const updateStudentMutation = useMutation({
+    // _ nghĩa là chúng ta không sử dụng bất kỳ biến nào
+    mutationFn: (_) => updateStudent(id as string, formState as Student),
+    // data: data trả về sau khi update
+    onSuccess: (data) => {
+      queryClient.setQueryData(['student', id], data)
+    }
+  })
+
   const studentQuery = useQuery({
     queryKey: ['student', id],
     queryFn: () => getStudent(id as string),
+    // Chỉ khi nào id của chúng ta tồn tại (khác null, rỗng, undefined) thì query function này mới hoạt động còn không thì query function này sẽ không chạy
     enabled: id !== undefined,
+    // Kiểm tra xem kết quả cũ mà được gọi trước đấy đã quá 10s hay chưa. Nếu chưa thì không chạy query function này
     staleTime: 1000 * 10
   })
 
   useEffect(() => {
+    // Vì ở bên màn hình Students.tsx đang dùng hàm handlePrefetchStudent để fetch trước data của student nên khi click edit thì chúng ta sẽ 
+    // kiểm tra xem nó có gọi lại api hay không (phụ thuộc vào staleTime). Nếu gọi lại api getStudent thì thực thi useEffect này
     if (studentQuery.data) {
       setFormState(studentQuery.data.data)
     }
   }, [studentQuery.data])
 
-  const updateStudentMutation = useMutation({
-    mutationFn: (_) => updateStudent(id as string, formState as Student),
-    onSuccess: (data) => {
-      queryClient.setQueryData(['student', id], data)
-    }
-  })
 
   const errorForm: FormError = useMemo(() => {
     const error = isAddMode ? addStudentMutation.error : updateStudentMutation.error
@@ -83,10 +90,12 @@ export default function AddStudent() {
   const handleChange = (name: keyof FormStateType) => (event: React.ChangeEvent<HTMLInputElement>) => {
     setFormState((prev) => ({ ...prev, [name]: event.target.value }))
     if (addStudentMutation.data || addStudentMutation.error) {
+      // Mỗi khi chúng ta xử lý lại sự kiện này thì nó sẽ remove đi cái error hoặc cái data của muatation thông qua reset
       addStudentMutation.reset()
     }
   }
 
+  // mutate mặc dù là 1 cái async function nhưng nó không có return về 1 cái promise
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     if (isAddMode) {
